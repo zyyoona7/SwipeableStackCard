@@ -35,6 +35,7 @@ public abstract class BaseSwipeItemAnimator extends SimpleItemAnimator {
     private ArrayList<RecyclerView.ViewHolder> mChangeAnimations = new ArrayList<>();
 
     protected Interpolator mInterpolator = new DecelerateInterpolator();
+    private OnRecoverAnimFinishedListener mOnRecoverAnimFinishedListener;
 
     private static class MoveInfo {
 
@@ -696,5 +697,17 @@ public abstract class BaseSwipeItemAnimator extends SimpleItemAnimator {
             mRemoveAnimations.remove(mViewHolder);
             dispatchFinishedWhenDone();
         }
+    }
+
+    @Override
+    public void onAddFinished(RecyclerView.ViewHolder item) {
+        super.onAddFinished(item);
+        if (mOnRecoverAnimFinishedListener != null) {
+            mOnRecoverAnimFinishedListener.onRecoverAnimFinished(item);
+        }
+    }
+
+    public void setOnRecoverAnimFinishedListener(OnRecoverAnimFinishedListener onRecoverAnimFinishedListener) {
+        mOnRecoverAnimFinishedListener = onRecoverAnimFinishedListener;
     }
 }

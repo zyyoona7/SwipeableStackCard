@@ -11,6 +11,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.chad.library.adapter.base.BaseViewHolder;
+import com.zyyoona7.swipeablestack.animator.BaseSwipeItemAnimator;
+import com.zyyoona7.swipeablestack.animator.OnRecoverAnimFinishedListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +23,8 @@ import java.util.List;
  * onSwiped方法直接从 Adapter 中移除数据从而达到滑出的效果，
  * 需要恢复时通过缓存的已删除列表中恢复达到滑回效果（有滑回动画需要配合{@link com.zyyoona7.swipeablestack.animator.DefaultSwipeItemAnimator 使用}）
  */
-public class StackItemTouchCallback<T, ADAPTER extends BaseQuickAdapter<T, ? extends BaseViewHolder>> extends ItemTouchHelper.Callback {
+public class StackItemTouchCallback<T, ADAPTER extends BaseQuickAdapter<T, ? extends BaseViewHolder>> extends ItemTouchHelper.Callback
+        implements OnRecoverAnimFinishedListener {
 
     private static final String TAG = "StackItemTouchCallback";
 
@@ -36,6 +39,9 @@ public class StackItemTouchCallback<T, ADAPTER extends BaseQuickAdapter<T, ? ext
     //记录执行onSwiped时的滑动方向，方便做滑回动画
     private int mRemovedDirection;
     private OnItemSwipedDirectionChangedListener mDirectionChangedListener;
+    private RecyclerView mRecyclerView;
+    //是否正在等待回调 onRecover
+    private boolean mIsWaitOnRecover = false;
 
     public StackItemTouchCallback(ADAPTER adapter,
                                   OnItemSwipedListener<T> listener, int removedCacheSize) {
@@ -48,6 +54,13 @@ public class StackItemTouchCallback<T, ADAPTER extends BaseQuickAdapter<T, ? ext
     @Override
     public int getMovementFlags(@NonNull RecyclerView recyclerView,
                                 @NonNull RecyclerView.ViewHolder viewHolder) {
+        if (mRecyclerView != recyclerView) {
+            mRecyclerView = recyclerView;
+            RecyclerView.ItemAnimator itemAnimator = mRecyclerView.getItemAnimator();
+            if (itemAnimator instanceof BaseSwipeItemAnimator) {
+                ((BaseSwipeItemAnimator) itemAnimator).setOnRecoverAnimFinishedListener(this);
+            }
+        }
         return makeMovementFlags(0, ItemTouchHelper.UP | ItemTouchHelper.DOWN);
     }
 
@@ -95,11 +108,12 @@ public class StackItemTouchCallback<T, ADAPTER extends BaseQuickAdapter<T, ? ext
         if (item == null) {
             return;
         }
+        mIsWaitOnRecover = true;
         mAdapter.addData(0, item);
         mRemovedList.remove(lastIndex);
-        if (mOnItemSwipedListener != null) {
-            mOnItemSwipedListener.onRecover();
-        }
+//        if (mOnItemSwipedListener != null) {
+//            mOnItemSwipedListener.onRecover();
+//        }
     }
 
     /**
@@ -109,11 +123,12 @@ public class StackItemTouchCallback<T, ADAPTER extends BaseQuickAdapter<T, ? ext
         if (mRemovedList.isEmpty()) {
             return;
         }
+        mIsWaitOnRecover = true;
         mAdapter.addData(0, mRemovedList);
         mRemovedList.clear();
-        if (mOnItemSwipedListener != null) {
-            mOnItemSwipedListener.onRecover();
-        }
+//        if (mOnItemSwipedListener != null) {
+//            mOnItemSwipedListener.onRecover();
+//        }
     }
 
     /**
@@ -136,6 +151,13 @@ public class StackItemTouchCallback<T, ADAPTER extends BaseQuickAdapter<T, ? ext
         if (removeIndex != -1) {
             mRemovedList.remove(removeIndex);
         }
+    }
+
+    void callOnRecover() {
+        if (mIsWaitOnRecover && mOnItemSwipedListener != null) {
+            mOnItemSwipedListener.onRecover();
+        }
+        mIsWaitOnRecover = false;
     }
 
     /**
@@ -263,5 +285,10 @@ public class StackItemTouchCallback<T, ADAPTER extends BaseQuickAdapter<T, ? ext
 
     public void setSwipeThreshold(@FloatRange(from = 0f, to = 1f) float swipeThreshold) {
         mSwipeThreshold = swipeThreshold;
+    }
+
+    @Override
+    public void onRecoverAnimFinished(RecyclerView.ViewHolder holder) {
+        callOnRecover();
     }
 }
